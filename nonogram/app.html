@@ -1,0 +1,467 @@
+<title>數織解題器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* Layout: one narrow column like a phone game screen — step 1 screenshot, step 2 clues, step 3 answer board */
+:root {
+  --bg: #eef6f5;
+  --surface: #ffffff;
+  --ink: #17383a;
+  --muted: #5b7476;
+  --line: #cfe0de;
+  --sea: #0f8a8d;
+  --sea-ink: #ffffff;
+  --gold: #f3bd1c;
+  --gold-edge: #c48d07;
+  --cell-empty: #f6faf9;
+  --x: #a9bfbd;
+  --warn-bg: #fff3d6;
+  --warn-ink: #7a4b00;
+  --bad-bg: #fde4e1;
+  --bad-ink: #9b2316;
+  --ok-bg: #dff4e8;
+  --ok-ink: #1d6b3d;
+  --font-num: "Fredoka", "Noto Sans TC", system-ui, sans-serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1c1d; --surface: #152a2b; --ink: #e3f1ef; --muted: #93adab; --line: #2a4546;
+    --sea: #3bb8b4; --sea-ink: #062224; --gold: #f0bb22; --gold-edge: #9a6d00;
+    --cell-empty: #102223; --x: #47605f;
+    --warn-bg: #3a2c0c; --warn-ink: #f7d38a; --bad-bg: #3d1713; --bad-ink: #ffb4a8;
+    --ok-bg: #12331f; --ok-ink: #9de0b6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1c1d; --surface: #152a2b; --ink: #e3f1ef; --muted: #93adab; --line: #2a4546;
+  --sea: #3bb8b4; --sea-ink: #062224; --gold: #f0bb22; --gold-edge: #9a6d00;
+  --cell-empty: #102223; --x: #47605f;
+  --warn-bg: #3a2c0c; --warn-ink: #f7d38a; --bad-bg: #3d1713; --bad-ink: #ffb4a8;
+  --ok-bg: #12331f; --ok-ink: #9de0b6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header h1 { font-family: var(--font-num); font-weight: 700; font-size: 1.75rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel h2 { margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+.step { font-family: var(--font-num); background: var(--sea); color: var(--sea-ink); width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; font-size: .9rem; flex: none; }
+.hint { color: var(--muted); font-size: .9rem; margin: 0; }
+.drop {
+  border: 2px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center;
+  cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  transition: border-color .15s, background .15s;
+}
+.drop:hover, .drop.over { border-color: var(--sea); background: color-mix(in srgb, var(--sea) 6%, transparent); }
+.drop img { max-height: 220px; border-radius: 8px; }
+.drop strong { font-size: 1rem; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button {
+  font: inherit; font-weight: 700; border-radius: 10px; padding: 10px 18px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+button.primary { background: var(--sea); color: var(--sea-ink); border-color: var(--sea); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, textarea:focus-visible, .drop:focus-visible { outline: 3px solid color-mix(in srgb, var(--sea) 55%, transparent); outline-offset: 2px; }
+.clues { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.clues label { font-weight: 700; font-size: .9rem; display: block; margin-bottom: 4px; }
+.clues label span { color: var(--muted); font-weight: 400; }
+textarea {
+  width: 100%; min-height: 330px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; background: var(--cell-empty); color: var(--ink);
+  font-family: var(--font-num); font-size: 1.02rem; line-height: 1.55; font-variant-numeric: tabular-nums;
+}
+.msg { border-radius: 10px; padding: 10px 12px; font-size: .92rem; margin: 0; white-space: pre-line; }
+.msg.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.msg.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.msg.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.tag { display: inline-block; font-size: .75rem; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn-ink); vertical-align: middle; }
+.board-scroll { overflow-x: auto; padding-bottom: 4px; }
+.board { display: grid; width: max-content; margin: 0 auto; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.cc { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; font-size: var(--fs); line-height: 1.05; padding-bottom: 3px; font-weight: 600; }
+.rc { display: flex; justify-content: flex-end; align-items: center; gap: .32em; font-size: var(--fs); padding-right: 6px; font-weight: 600; white-space: nowrap; }
+.cc.hl, .rc.hl { color: var(--sea); }
+.cell { width: var(--cs); height: var(--cs); background: var(--cell-empty); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); position: relative; cursor: pointer; }
+.cell.f { background: var(--gold); box-shadow: inset 0 0 0 2px var(--gold-edge); border-radius: 3px; }
+.cell.e::after { content: "×"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--x); font-size: calc(var(--cs) * .55); line-height: 1; }
+.cell.done { opacity: .28; }
+.cell.vr { border-right: 2px solid var(--ink); }
+.cell.vb { border-bottom: 2px solid var(--ink); }
+.cell.vl { border-left: 2px solid var(--ink); }
+.cell.vt { border-top: 2px solid var(--ink); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: .85rem; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+.legend .lf { background: var(--gold); box-shadow: inset 0 0 0 2px var(--gold-edge); }
+.legend .le { background: var(--cell-empty); border: 1px solid var(--line); }
+@media (max-width: 520px) {
+  .clues { grid-template-columns: 1fr 1fr; gap: 8px; }
+  textarea { min-height: 300px; font-size: .95rem; }
+  header h1 { font-size: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>數織解題器</h1>
+    <p>上傳遊戲截圖，自動讀出提示數字並解出答案。</p>
+  </header>
+
+  <section class="panel" id="p1">
+    <h2><span class="step">1</span>上傳截圖</h2>
+    <label class="drop" id="drop" tabindex="0">
+      <input type="file" id="file" accept="image/*" hidden>
+      <img id="preview" alt="已選的截圖" hidden>
+      <strong id="dropText">點這裡選擇截圖，或拖曳、貼上圖片</strong>
+      <span class="hint">截圖要包含上方和左側的所有提示數字</span>
+    </label>
+    <div class="row">
+      <button class="primary" id="readBtn" disabled>讀取提示數字</button>
+      <button id="stopBtn" hidden>停止</button>
+    </div>
+    <p class="msg" id="readMsg" hidden></p>
+  </section>
+
+  <section class="panel" id="p2">
+    <h2><span class="step">2</span>確認提示數字 <span class="tag" id="exampleTag">範例：第42關</span></h2>
+    <p class="hint">每行一組，數字用空格分開；空白的一列寫 0。讀錯的地方可以直接修改。</p>
+    <div class="clues">
+      <div>
+        <label for="rows">橫列 <span>(由上到下)</span></label>
+        <textarea id="rows" spellcheck="false" inputmode="numeric"></textarea>
+      </div>
+      <div>
+        <label for="cols">直行 <span>(由左到右，數字由上往下)</span></label>
+        <textarea id="cols" spellcheck="false" inputmode="numeric"></textarea>
+      </div>
+    </div>
+    <div class="row"><button class="primary" id="solveBtn">解題</button></div>
+    <p class="msg" id="solveMsg" hidden></p>
+  </section>
+
+  <section class="panel" id="p3">
+    <h2><span class="step">3</span>答案</h2>
+    <div class="board-scroll"><div class="board" id="board"></div></div>
+    <div class="legend">
+      <span><i class="lf"></i>要塗</span>
+      <span><i class="le"></i>留空</span>
+      <span>點格子可以標記「已經塗好」，方便對照</span>
+    </div>
+  </section>
+</div>
+
+<script>
+const EXAMPLE_ROWS = `5 1 2 2
+2 3 2 1
+2 2 2 1
+5 5 1
+5 1 3 2
+2 1 8
+3 1 2 4
+3 2 2 1 2
+2 2 3 2
+1 3 5 2
+4 6
+6 2 4
+6 1
+4 10
+15`;
+const EXAMPLE_COLS = `4 3 4
+9 4
+1 5 5
+2 2 1 6
+2 3 5 1
+2 1 8
+2 2 2
+1 3 3 2
+2 7 2
+10 3
+2 3 4 2
+1 4 3 2
+1 2 1 2 2
+1 6 1 2
+2 5 1 2`;
+
+const $ = (id) => document.getElementById(id);
+const rowsEl = $("rows"), colsEl = $("cols");
+rowsEl.value = EXAMPLE_ROWS; colsEl.value = EXAMPLE_COLS;
+[rowsEl, colsEl].forEach(el => el.addEventListener("input", () => { $("exampleTag").hidden = true; }));
+
+function show(el, text, kind) {
+  el.hidden = !text; el.textContent = text || ""; el.className = "msg " + (kind || "");
+}
+
+/* ---------- 解題 ---------- */
+const U = -1, E = 0, F = 1;
+
+function parseClues(text) {
+  return text.split(/\n/).map(l => l.trim()).filter(l => l.length)
+    .map(l => l.split(/[\s,，、]+/).map(Number).filter(n => Number.isFinite(n) && n > 0));
+}
+
+function lineSolve(clue, cells) {
+  const n = cells.length, k = clue.length;
+  const minLen = new Array(k + 1).fill(0);
+  for (let i = k - 1; i >= 0; i--) minLen[i] = clue[i] + (i + 1 < k ? minLen[i + 1] + 1 : 0);
+  // prefix count of FILLED / EMPTY for O(1) range checks
+  const pf = [0], pe = [0];
+  for (let i = 0; i < n; i++) { pf.push(pf[i] + (cells[i] === F)); pe.push(pe[i] + (cells[i] === E)); }
+  const anyF = (a, b) => pf[b] - pf[a] > 0, anyE = (a, b) => pe[b] - pe[a] > 0;
+  const canF = new Array(n).fill(false), canE = new Array(n).fill(false);
+  const memo = new Map();
+  function ok(pos, idx) {
+    const key = pos * 64 + idx;
+    if (memo.has(key)) return memo.get(key);
+    let res = false;
+    if (idx === k) {
+      res = !anyF(pos, n);
+      if (res) for (let p = pos; p < n; p++) canE[p] = true;
+    } else {
+      const len = clue[idx], last = n - minLen[idx];
+      for (let s = pos; s <= last; s++) {
+        if (s > pos && cells[s - 1] === F) break;
+        const end = s + len;
+        if (anyE(s, end)) continue;
+        if (end < n && cells[end] === F) continue;
+        const nxt = end < n ? end + 1 : end;
+        if (ok(nxt, idx + 1)) {
+          res = true;
+          for (let p = pos; p < s; p++) canE[p] = true;
+          for (let p = s; p < end; p++) canF[p] = true;
+          if (end < n) canE[end] = true;
+        }
+      }
+    }
+    memo.set(key, res);
+    return res;
+  }
+  if (!ok(0, 0)) return null;
+  return cells.map((_, i) => canF[i] && !canE[i] ? F : canE[i] && !canF[i] ? E : U);
+}
+
+function propagate(g, rows, cols) {
+  const h = rows.length, w = cols.length;
+  let dr = new Set(rows.keys()), dc = new Set(cols.keys());
+  while (dr.size || dc.size) {
+    for (const r of dr) {
+      const nw = lineSolve(rows[r], g[r]);
+      if (!nw) return false;
+      for (let c = 0; c < w; c++) if (g[r][c] !== nw[c]) { g[r][c] = nw[c]; dc.add(c); }
+    }
+    dr = new Set();
+    for (const c of dc) {
+      const col = g.map(row => row[c]);
+      const nw = lineSolve(cols[c], col);
+      if (!nw) return false;
+      for (let r = 0; r < h; r++) if (g[r][c] !== nw[r]) { g[r][c] = nw[r]; dr.add(r); }
+    }
+    dc = new Set();
+  }
+  return true;
+}
+
+function solve(rows, cols, limit = 2) {
+  const sols = [];
+  let steps = 0;
+  (function rec(g) {
+    if (sols.length >= limit || ++steps > 20000) return;
+    if (!propagate(g, rows, cols)) return;
+    for (let r = 0; r < g.length; r++) for (let c = 0; c < g[r].length; c++) if (g[r][c] === U) {
+      for (const v of [F, E]) { const n = g.map(x => x.slice()); n[r][c] = v; rec(n); }
+      return;
+    }
+    sols.push(g);
+  })(rows.map(() => cols.map(() => U)));
+  return sols;
+}
+
+function checkClues(rows, cols) {
+  const errs = [];
+  if (!rows.length || !cols.length) return ["橫列和直行都要填提示數字"];
+  const w = cols.length, h = rows.length;
+  rows.forEach((cl, i) => { const need = cl.reduce((a, b) => a + b, 0) + Math.max(cl.length - 1, 0); if (need > w) errs.push(`第 ${i + 1} 列「${cl.join(" ")}」需要 ${need} 格，超過寬度 ${w}`); });
+  cols.forEach((cl, i) => { const need = cl.reduce((a, b) => a + b, 0) + Math.max(cl.length - 1, 0); if (need > h) errs.push(`第 ${i + 1} 行「${cl.join(" ")}」需要 ${need} 格，超過高度 ${h}`); });
+  const sr = rows.flat().reduce((a, b) => a + b, 0), sc = cols.flat().reduce((a, b) => a + b, 0);
+  if (sr !== sc) errs.push(`橫列加總 ${sr} 格，直行加總 ${sc} 格，兩邊應該相同。差了 ${Math.abs(sr - sc)}，請檢查有沒有讀錯的數字。`);
+  return errs;
+}
+
+/* ---------- 答案盤面 ---------- */
+let current = null;
+function renderBoard(grid, rows, cols) {
+  const board = $("board");
+  const h = rows.length, w = cols.length;
+  const avail = Math.min(document.querySelector(".wrap").clientWidth - 34, 690);
+  const maxRowLen = Math.max(...rows.map(r => r.length), 1);
+  const maxColLen = Math.max(...cols.map(c => c.length), 1);
+  let cs = Math.floor(avail / (w + maxRowLen * 0.62 + 0.4));
+  cs = Math.max(18, Math.min(cs, 36));
+  const fs = Math.max(10, Math.round(cs * 0.5));
+  board.style.setProperty("--cs", cs + "px");
+  board.style.setProperty("--fs", fs + "px");
+  board.style.gridTemplateColumns = `auto repeat(${w}, ${cs}px)`;
+  board.replaceChildren();
+  board.append(document.createElement("div"));
+  cols.forEach((cl, c) => {
+    const d = document.createElement("div"); d.className = "cc"; d.dataset.c = c;
+    d.style.minHeight = (maxColLen * fs * 1.08 + 6) + "px";
+    (cl.length ? cl : [0]).forEach(n => { const s = document.createElement("span"); s.textContent = n; d.append(s); });
+    board.append(d);
+  });
+  rows.forEach((cl, r) => {
+    const d = document.createElement("div"); d.className = "rc"; d.dataset.r = r;
+    (cl.length ? cl : [0]).forEach(n => { const s = document.createElement("span"); s.textContent = n; d.append(s); });
+    board.append(d);
+    for (let c = 0; c < w; c++) {
+      const cell = document.createElement("div");
+      cell.className = "cell " + (grid[r][c] === F ? "f" : "e");
+      if (c === 0) cell.classList.add("vl");
+      if (r === 0) cell.classList.add("vt");
+      if ((c + 1) % 5 === 0 || c === w - 1) cell.classList.add("vr");
+      if ((r + 1) % 5 === 0 || r === h - 1) cell.classList.add("vb");
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.title = `第 ${r + 1} 列，第 ${c + 1} 行`;
+      board.append(cell);
+    }
+  });
+  current = { grid, rows, cols };
+}
+$("board").addEventListener("click", (e) => {
+  const cell = e.target.closest(".cell"); if (cell) cell.classList.toggle("done");
+});
+$("board").addEventListener("pointerover", (e) => {
+  const cell = e.target.closest(".cell");
+  document.querySelectorAll(".hl").forEach(x => x.classList.remove("hl"));
+  if (!cell) return;
+  document.querySelector(`.rc[data-r="${cell.dataset.r}"]`)?.classList.add("hl");
+  document.querySelector(`.cc[data-c="${cell.dataset.c}"]`)?.classList.add("hl");
+});
+
+function runSolve() {
+  const rows = parseClues(rowsEl.value), cols = parseClues(colsEl.value);
+  const errs = checkClues(rows, cols);
+  if (errs.length) { show($("solveMsg"), errs.join("\n"), "bad"); return false; }
+  const sols = solve(rows, cols);
+  if (!sols.length) { show($("solveMsg"), `這組提示（${rows.length} 列 × ${cols.length} 行）沒有解，應該有數字讀錯了。請對照截圖檢查。`, "bad"); return false; }
+  renderBoard(sols[0], rows, cols);
+  if (sols.length > 1) show($("solveMsg"), `解出來了（${rows.length} × ${cols.length}），但這組提示不只一種解法，下面是其中一種。若和遊戲不符，請檢查有沒有讀錯的數字。`, "warn");
+  else show($("solveMsg"), `解出來了：${rows.length} 列 × ${cols.length} 行，唯一解。`, "ok");
+  return true;
+}
+$("solveBtn").addEventListener("click", () => { if (runSolve()) $("p3").scrollIntoView({ behavior: "smooth", block: "start" }); });
+
+/* ---------- 截圖讀取 ---------- */
+let imgFile = null, sample = null, ctl = null;
+
+function setImage(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  imgFile = file;
+  const url = URL.createObjectURL(file);
+  $("preview").src = url; $("preview").hidden = false;
+  $("dropText").textContent = "已選擇截圖，點這裡可以換一張";
+  $("readBtn").disabled = !sample;
+  if (!sample) show($("readMsg"), "這個檢視環境不能自動讀圖，請在下方直接輸入提示數字。", "warn");
+  else show($("readMsg"), "");
+}
+$("file").addEventListener("change", (e) => setImage(e.target.files[0]));
+const drop = $("drop");
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setImage(e.dataTransfer.files[0]); });
+document.addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+  if (item) setImage(item.getAsFile());
+});
+
+/* 遊戲截圖很長，提示數字在下半部。把下半部裁出來送出，數字比較清楚。 */
+function cropForClues(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight;
+      if (H < W * 1.5) { resolve([file]); return; }
+      const y0 = Math.round(H * 0.38), y1 = Math.round(H * 0.88);
+      const cv = document.createElement("canvas");
+      cv.width = W; cv.height = y1 - y0;
+      cv.getContext("2d").drawImage(img, 0, y0, W, y1 - y0, 0, 0, W, y1 - y0);
+      cv.toBlob(b => resolve(b ? [b] : [file]), "image/png");
+    };
+    img.onerror = () => resolve([file]);
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+const PROMPT = `這是一張數織（Nonogram / Picross）遊戲的截圖。請讀出所有提示數字。
+
+- 左側每一列的提示：由上到下，每列的數字由左往右讀。
+- 上方每一行的提示：由左到右，每行的數字由上往下讀。
+- 注意 10 以上是兩位數（例如「10」「15」是一個數字，不是 1 和 0）。數字之間通常有小間隔，兩位數的字距比較緊。
+- 忽略格子外側的刻度數字（如 5、10、15 標記格子位置的那種）。
+- 忽略格子裡已經填的方塊或 ×，只讀提示數字。
+- 每個提示是一段連續塗色的長度，同一列的數字加起來再加上段數減一，不會超過寬度。
+- 所有橫列數字的總和，必須等於所有直行數字的總和，請自己核對。
+
+只回傳 JSON，格式：{"rows": [[5,1,2,2], ...], "cols": [[4,3,4], ...]}`;
+
+$("readBtn").addEventListener("click", async () => {
+  if (!sample || !imgFile) return;
+  ctl = new AbortController();
+  $("readBtn").disabled = true; $("stopBtn").hidden = false;
+  show($("readMsg"), "正在讀取截圖上的數字，大約需要半分鐘到一分鐘…", "");
+  try {
+    const images = await cropForClues(imgFile);
+    const data = await sample.json(PROMPT, { images, signal: ctl.signal, modelTier: "complex" });
+    const ok = (a) => Array.isArray(a) && a.length && a.every(l => Array.isArray(l));
+    if (!data || !ok(data.rows) || !ok(data.cols)) throw { code: "bad_shape" };
+    const fmt = (a) => a.map(l => (l.map(Number).filter(n => n > 0).join(" ") || "0")).join("\n");
+    rowsEl.value = fmt(data.rows); colsEl.value = fmt(data.cols);
+    $("exampleTag").hidden = true;
+    show($("readMsg"), `讀到 ${data.rows.length} 列、${data.cols.length} 行。請對照截圖確認下方數字。`, "ok");
+    if (runSolve()) $("p3").scrollIntoView({ behavior: "smooth", block: "start" });
+    else $("p2").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    const code = e?.code;
+    const copy = {
+      cancelled: "",
+      not_granted: "沒有允許讀圖，請在下方直接輸入提示數字。",
+      sampling_disabled: "這個帳號不能使用自動讀圖，請在下方直接輸入提示數字。",
+      images_unavailable: "這個檢視環境不能傳送圖片，請在下方直接輸入提示數字。",
+      rate_limited: "使用次數太頻繁，請稍後再試。",
+      image_rejected: "這張圖片無法讀取，請換一張截圖（PNG 或 JPG）。",
+      invalid_json: "讀取結果格式不對，請再按一次「讀取提示數字」。",
+      bad_shape: "讀取結果格式不對，請再按一次「讀取提示數字」。",
+      session_expired: "登入已過期，請重新登入後再試。",
+    };
+    const msg = code in copy ? copy[code] : "讀取失敗，請再試一次，或在下方直接輸入提示數字。";
+    show($("readMsg"), msg, code === "cancelled" ? "" : "bad");
+    if (code === "not_granted" || code === "sampling_disabled" || code === "images_unavailable") sample = null;
+  } finally {
+    $("readBtn").disabled = !sample || !imgFile; $("stopBtn").hidden = true;
+  }
+});
+$("stopBtn").addEventListener("click", () => ctl?.abort());
+
+(async () => {
+  try {
+    const s = await window.claude?.use?.("sample");
+    if (!s) return;
+    const lim = await s.limits().catch(() => null);
+    if (lim?.images) { sample = s; $("readBtn").disabled = !imgFile; }
+  } catch {}
+})();
+
+runSolve();
+window.addEventListener("resize", () => { if (current) renderBoard(current.grid, current.rows, current.cols); });
+</script>
